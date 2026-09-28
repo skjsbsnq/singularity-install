@@ -26,8 +26,18 @@ if grep -q 'experimental-features' "$CONFIG"; then
 else
   echo "[1/4] 在 configuration.nix 中启用 flakes"
   cp "$CONFIG" "$CONFIG.bak.$(date +%s)"
-  # 插到第一个 { 后面
-  sed -i '0,/{/s//{\n  nix.settings.experimental-features = [ "nix-command" "flakes" ];/' "$CONFIG"
+  # 找模块体开始的那一行（单独一个 { 的行），在它后面插入
+  # 如果找不到只含 { 的行，就用 { config, pkgs, ... }: 那一行
+  if grep -q '^{[[:space:]]*$' "$CONFIG"; then
+    # 在只含 { 的行后插入
+    sed -i '/^{[[:space:]]*$/a\  nix.settings.experimental-features = [ "nix-command" "flakes" ];' "$CONFIG"
+  elif grep -q '}:$' "$CONFIG"; then
+    # 在 }: 行后插入（模块体在下一行）
+    sed -i '/}:$/a\{\n  nix.settings.experimental-features = [ "nix-command" "flakes" ];' "$CONFIG"
+  else
+    echo "错误：找不到 configuration.nix 的模块体，请手动加 nix.settings.experimental-features"
+    exit 1
+  fi
 fi
 
 # 第 2 步：写 flake.nix
